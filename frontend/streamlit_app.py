@@ -19,6 +19,7 @@ from app.core.memory import ConversationMemory
 from app.core.schema_builder import build_schema_string, get_column_names, get_date_column_formats
 from app.core.sql_validator import validate_sql
 from app.core.text_to_sql import correct_sql, fix_date_casts, generate_sql, rewrite_intent
+from app.core.semantic_cache import SemanticCache
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -301,6 +302,7 @@ def _init_state():
         "csv_col_count": 0,
         "duckdb_engine": None,
         "conversation_memory": ConversationMemory(k=int(os.getenv("MAX_CONVERSATION_TURNS", "6"))),
+        "semantic_cache": SemanticCache(),
         "query_history": [],
         "session_id": str(uuid.uuid4()),
         "total_queries": 0,
@@ -376,9 +378,11 @@ if not st.session_state.csv_loaded:
 else:
     col_a, col_b = st.columns([3, 1])
     with col_a:
+        cache_stats = st.session_state.semantic_cache.stats()
+        cache_note = f" &nbsp;·&nbsp; cache hits: {cache_stats['hits']}/{cache_stats['hits'] + cache_stats['misses']}" if (cache_stats['hits'] + cache_stats['misses']) > 0 else ""
         st.markdown(f"""
         <div class="setup-row">
-            <div class="setup-meta">▪ <b>{st.session_state.csv_filename}</b> &nbsp;·&nbsp; {st.session_state.csv_row_count:,} rows &nbsp;·&nbsp; {st.session_state.csv_col_count} columns &nbsp;·&nbsp; {st.session_state.total_queries} queries asked</div>
+            <div class="setup-meta">▪ <b>{st.session_state.csv_filename}</b> &nbsp;·&nbsp; {st.session_state.csv_row_count:,} rows &nbsp;·&nbsp; {st.session_state.csv_col_count} columns &nbsp;·&nbsp; {st.session_state.total_queries} queries asked{cache_note}</div>
         </div>
         """, unsafe_allow_html=True)
     with col_b:
@@ -386,6 +390,7 @@ else:
             for key in ["csv_loaded", "schema_string", "csv_filename", "query_history"]:
                 st.session_state[key] = False if key == "csv_loaded" else ("" if "string" in key or "name" in key else [])
             st.session_state.conversation_memory.clear()
+            st.session_state.semantic_cache.clear()
             st.session_state.total_queries = 0
             st.rerun()
 
@@ -418,6 +423,7 @@ def run_pipeline(user_question: str):
     schema_string = st.session_state.schema_string
     columns = st.session_state.columns
     memory: ConversationMemory = st.session_state.conversation_memory
+    cache: SemanticCache = st.session_state.semantic_cache
     db: DBEngine = st.session_state.duckdb_engine
     max_retries = int(os.getenv("MAX_SQL_RETRIES", "2"))
     date_formats = st.session_state.get("date_col_formats", {})
@@ -445,9 +451,16 @@ def run_pipeline(user_question: str):
             rewritten = rewrite_intent(user_question, conversation_history=history_str)
             record["rewritten_intent"] = rewritten
 
-            st.write("Generating SQL…")
-            sql = generate_sql(rewritten, schema_string, history_str)
-            sql = fix_date_casts(sql, date_formats)
+            st.write("Checking cache…")
+            cached = cache.find(rewritten)
+
+            if cached is not None:
+                st.write("Cache hit — skipping SQL generation")
+                sql = cached.sql
+            else:
+                st.write("Generating SQL…")
+                sql = generate_sql(rewritten, schema_string, history_str)
+                sql = fix_date_casts(sql, date_formats)
 
             if sql == "CANNOT_ANSWER":
                 msg = f"I can't answer that from the available data. Columns: {', '.join(columns)}"
@@ -495,6 +508,16 @@ def run_pipeline(user_question: str):
             chart_type = detect_chart_type(qr.columns, qr.rows)
             record["chart_type"] = chart_type
             record["chart_fig"] = generate_chart(qr.columns, qr.rows, chart_type)
+
+            if cached is None:
+                cache.add(
+                    rewritten_intent=rewritten,
+                    sql=validation.cleaned_sql,
+                    result_rows=qr.rows,
+                    result_columns=qr.columns,
+                    narration=narration,
+                    chart_type=chart_type,
+                )
 
             memory.add_turn(
                 user_question=user_question,
