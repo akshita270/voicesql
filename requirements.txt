@@ -1,5 +1,6 @@
 streamlit==1.35.0
 openai==1.30.0
+av==12.3.0
 faster-whisper==1.0.1
 duckdb==0.10.3
 pandas==2.2.2
