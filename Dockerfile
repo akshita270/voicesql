@@ -13,4 +13,8 @@ COPY . .
 
 EXPOSE 7860
 
-CMD ["streamlit", "run", "frontend/streamlit_app.py", "--server.port=7860", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "frontend/streamlit_app.py", \
+     "--server.port=7860", \
+     "--server.address=0.0.0.0", \
+     "--server.enableXsrfProtection=false", \
+     "--server.enableCORS=false"]
