@@ -4,15 +4,6 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    pkg-config \
-    build-essential \
-    libavformat-dev \
-    libavcodec-dev \
-    libavdevice-dev \
-    libavutil-dev \
-    libavfilter-dev \
-    libswscale-dev \
-    libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
