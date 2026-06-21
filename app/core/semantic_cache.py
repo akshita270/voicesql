@@ -57,6 +57,7 @@ class SemanticCache:
     entries: list[CacheEntry] = field(default_factory=list)
     hits: int = 0
     misses: int = 0
+    _pending_embedding: Optional[tuple[str, list[float]]] = field(default=None, repr=False)
 
     def find(self, rewritten_intent: str) -> Optional[CacheEntry]:
         if not self.entries:
@@ -64,6 +65,9 @@ class SemanticCache:
             return None
 
         query_embedding = get_embedding(rewritten_intent)
+        # Stash it so add() can reuse it instead of re-embedding the same text.
+        self._pending_embedding = (rewritten_intent, query_embedding)
+
         best_entry = None
         best_score = 0.0
 
@@ -89,7 +93,12 @@ class SemanticCache:
         narration: str,
         chart_type: str,
     ) -> None:
-        embedding = get_embedding(rewritten_intent)
+        if self._pending_embedding is not None and self._pending_embedding[0] == rewritten_intent:
+            embedding = self._pending_embedding[1]
+        else:
+            embedding = get_embedding(rewritten_intent)
+        self._pending_embedding = None
+
         self.entries.append(CacheEntry(
             rewritten_intent=rewritten_intent,
             embedding=embedding,

@@ -506,8 +506,12 @@ def run_pipeline(user_question: str):
                 "truncated": qr.truncated,
             })
 
-            st.write("Preparing answer…")
-            narration = generate_verified_narration(user_question, qr.rows)
+            if cached is not None and cached.result_rows == qr.rows:
+                st.write("Reusing cached answer…")
+                narration = cached.narration
+            else:
+                st.write("Preparing answer…")
+                narration = generate_verified_narration(user_question, qr.rows)
             record["narration_text"] = narration
 
             chart_type = detect_chart_type(qr.columns, qr.rows)
