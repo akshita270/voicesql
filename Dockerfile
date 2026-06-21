@@ -3,8 +3,16 @@ FROM python:3.11-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
-    portaudio19-dev \
     ffmpeg \
+    pkg-config \
+    build-essential \
+    libavformat-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
+    libswscale-dev \
+    libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -12,6 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8000 8501
+EXPOSE 7860
 
-CMD ["bash", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 & streamlit run frontend/streamlit_app.py --server.port 8501 --server.address 0.0.0.0"]
+CMD ["streamlit", "run", "frontend/streamlit_app.py", "--server.port=7860", "--server.address=0.0.0.0"]
