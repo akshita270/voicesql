@@ -32,7 +32,7 @@ def generate_narration(user_question: str, query_result: list[dict]) -> str:
     """Generate a spoken narration of the query result using GPT-4o."""
     result_json = json.dumps(query_result, default=str)
     response = _get_client().chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": NARRATION_SYSTEM_PROMPT},
             {
@@ -141,7 +141,7 @@ def generate_verified_narration(
             "Rewrite your answer using ONLY exact figures from the result above."
         )
         response = _get_client().chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": NARRATION_SYSTEM_PROMPT},
                 {"role": "user", "content": correction_prompt},

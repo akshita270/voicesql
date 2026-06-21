@@ -60,7 +60,7 @@ def rewrite_intent(
     history_ctx = f"\n\nCONVERSATION HISTORY (use this to resolve pronouns and references):\n{conversation_history}" if conversation_history else ""
     system = INTENT_SYSTEM_PROMPT + date_ctx + history_ctx
     response = _get_client().chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user_question},
