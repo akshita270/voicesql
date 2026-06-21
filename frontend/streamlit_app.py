@@ -459,7 +459,12 @@ def run_pipeline(user_question: str):
                 sql = cached.sql
             else:
                 st.write("Generating SQL…")
-                sql = generate_sql(rewritten, schema_string, history_str)
+                sql_placeholder = st.empty()
+                sql = generate_sql(
+                    rewritten, schema_string, history_str,
+                    on_token=lambda partial: sql_placeholder.code(partial, language="sql"),
+                )
+                sql_placeholder.empty()
                 sql = fix_date_casts(sql, date_formats)
 
             if sql == "CANNOT_ANSWER":

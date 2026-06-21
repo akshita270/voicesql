@@ -80,15 +80,35 @@ def generate_sql(
     rewritten_question: str,
     schema_string: str,
     conversation_history: str = "",
+    on_token: Optional[callable] = None,
 ) -> str:
-    """Generate SQL from a rewritten question and schema. Returns SQL or 'CANNOT_ANSWER'."""
+    """
+    Generate SQL from a rewritten question and schema. Returns SQL or 'CANNOT_ANSWER'.
+    If on_token is provided, it's called with the accumulated text after each
+    streamed chunk so the caller can render live progress (e.g. in a Streamlit
+    status box) without changing total latency.
+    """
     current_date = datetime.now().strftime("%Y-%m-%d")
     system = SQL_SYSTEM_PROMPT_TEMPLATE.format(
         schema_string=schema_string,
         conversation_history=conversation_history or "No prior conversation.",
         current_date=current_date,
     )
-    response = _get_client().chat.completions.create(
+
+    if on_token is None:
+        response = _get_client().chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": rewritten_question},
+            ],
+            max_tokens=500,
+            temperature=0,
+        )
+        raw = response.choices[0].message.content.strip()
+        return _strip_markdown(raw)
+
+    stream = _get_client().chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": system},
@@ -96,9 +116,15 @@ def generate_sql(
         ],
         max_tokens=500,
         temperature=0,
+        stream=True,
     )
-    raw = response.choices[0].message.content.strip()
-    return _strip_markdown(raw)
+    accumulated = ""
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            accumulated += delta
+            on_token(accumulated)
+    return _strip_markdown(accumulated.strip())
 
 
 def _strip_markdown(sql: str) -> str:
