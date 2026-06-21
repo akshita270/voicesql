@@ -153,7 +153,8 @@ html, body, [class*="css"] {
 }
 .or-row {
     text-align: center;
-    color: var(--line);
+    color: var(--ink);
+    font-weight: 600;
     font-size: 0.72rem;
     letter-spacing: 1px;
     text-transform: uppercase;
