@@ -27,15 +27,11 @@ Rules:
 - Keep the question concise and unambiguous
 Return ONLY the rewritten question. No explanation."""
 
+## Below this point, content stays byte-identical across every call within a session
+## (same schema, same rules) so OpenAI's prompt caching can discount/speed up
+## reprocessing it. Dynamic content (date, conversation history) is appended
+## after this static block — never insert anything dynamic above it.
 SQL_SYSTEM_PROMPT_TEMPLATE = """You are an expert SQL analyst. Generate a single valid SQL query to answer the user's question.
-
-DATABASE SCHEMA:
-{schema_string}
-
-CONVERSATION HISTORY:
-{conversation_history}
-
-CURRENT DATE: {current_date}
 
 RULES:
 1. Use ONLY column names that exist in the schema above. Never invent column names.
@@ -47,7 +43,16 @@ RULES:
 7. Use conversation history to resolve references like "that country", "it", "those products" — replace them with actual values from prior turns.
 8. Only return CANNOT_ANSWER if the question is completely unrelated to the dataset (e.g. asking about weather, news). Never return CANNOT_ANSWER just because a column has a different name than expected — look for equivalent columns.
 9. Follow all DATA-SPECIFIC RULES listed in the schema above — they are auto-detected from the actual dataset and override general assumptions.
-10. CRITICAL: Never use CAST(column AS TIMESTAMP) for date strings. Always use strptime(column, 'format') with the format from DATA-SPECIFIC RULES. Example: strftime(strptime("InvoiceDate", '%m/%d/%Y %H:%M'), '%Y-%m') AS Month"""
+10. CRITICAL: Never use CAST(column AS TIMESTAMP) for date strings. Always use strptime(column, 'format') with the format from DATA-SPECIFIC RULES. Example: strftime(strptime("InvoiceDate", '%m/%d/%Y %H:%M'), '%Y-%m') AS Month
+
+DATABASE SCHEMA:
+{schema_string}
+
+---
+CURRENT DATE: {current_date}
+
+CONVERSATION HISTORY:
+{conversation_history}"""
 
 
 def rewrite_intent(
